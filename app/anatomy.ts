@@ -17,11 +17,11 @@ export interface Concept {id:string;name:string;elements:string[]}
 export interface Atlas {version:string;source?:string;scope?:string;parts:Part[];concepts:Concept[];chunks:{url:string;bytes:number;gzip?:string;gzipBytes?:number}[];triangles:number}
 export type View = 'three-quarter'|'anterior'|'lateral'|'superior'|'posterior';
 export const VIEWS:{id:View;label:string;name:string}[] = [
- {id:'three-quarter',label:'¾',name:'Three-quarter view'},
- {id:'anterior',label:'A',name:'Anterior view'},
- {id:'lateral',label:'L',name:'Lateral view'},
- {id:'superior',label:'S',name:'Superior view'},
- {id:'posterior',label:'P',name:'Posterior view'},
+ {id:'three-quarter',label:'OBL',name:'Oblique view'},
+ {id:'anterior',label:'ANT',name:'Anterior view'},
+ {id:'lateral',label:'LAT',name:'Lateral view'},
+ {id:'superior',label:'SUP',name:'Superior view'},
+ {id:'posterior',label:'POS',name:'Posterior view'},
 ];
 export interface SceneState {inspectorOpen?:boolean;explode:number;visible:SystemId[];selected:string[];isolate:boolean;view:View;rotate:boolean;reset:number}
 export const DEFAULT_VISIBLE:SystemId[] = ['cortex','whitematter','limbic','diencephalon','brainstem','cerebellum','ventricles','cranialnerves'];

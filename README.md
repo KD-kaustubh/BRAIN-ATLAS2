@@ -7,10 +7,12 @@ An interactive 3D atlas of the human brain, built with React, Three.js, and shad
 - Orbit, zoom, and select structures directly on the brain.
 - Toggle regions, or jump to the cortex, deep brain, and brainstem presets.
 - Move from the assembled brain to a spaced inventory of every visible structure.
-- Switch between three-quarter, anterior, lateral, superior, and posterior views.
+- Switch between oblique, anterior, lateral, superior, and posterior views.
 - Search anatomical names and FMA identifiers.
 - Isolate a selected structure and read its description.
 - Use compact controls and detail panels on mobile.
+
+The interface is a dark imaging-console layout: a docked region rail, a docked inspector that the rest of the layout makes room for, and monospaced readouts.
 
 ## Run locally
 
