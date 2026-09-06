@@ -2,6 +2,8 @@
 
 An interactive 3D atlas of the human brain, built with React, Three.js, and shadcn/ui. Take the brain apart into **139 individually selectable structures**, explore **9 anatomical regions**, and search **308 named concepts** — from cortical gyri and deep nuclei to the brainstem, cerebellum, ventricular spaces, and cranial nerves.
 
+**[Explore the live atlas](https://brain-atlas-ivory.vercel.app/)**
+
 ## Explore
 
 - Orbit, zoom, and select structures directly on the brain.
