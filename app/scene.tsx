@@ -6,11 +6,12 @@ import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {createExplosionLayout} from './explosion-layout';
 import {decodeModelResponse} from './model-download';
 import {PointerTap} from './pointer-tap';
-import {SLICE_AXIS,STAGE,SYSTEMS,type Atlas,type SceneState,type View} from './anatomy';
-interface Props {atlas:Atlas;state:SceneState;onSelect:(id:string)=>void;onSliceAt:(at:number)=>void;onProgress:(n:number)=>void;onError:(s:string)=>void}
-export default function AnatomyScene({atlas,state,onSelect,onSliceAt,onProgress,onError}:Props){
- const host=useRef<HTMLDivElement>(null),latest=useRef(state),select=useRef(onSelect),slide=useRef(onSliceAt);
- latest.current=state;select.current=onSelect;slide.current=onSliceAt;
+import {SLICE_AXIS,STAGE,SYSTEMS,type Atlas,type SceneState,type Theme,type View} from './anatomy';
+interface Props {atlas:Atlas;state:SceneState;theme:Theme;onSelect:(id:string)=>void;onSliceAt:(at:number)=>void;onProgress:(n:number)=>void;onError:(s:string)=>void}
+export default function AnatomyScene({atlas,state,theme,onSelect,onSliceAt,onProgress,onError}:Props){
+ const host=useRef<HTMLDivElement>(null),latest=useRef(state),select=useRef(onSelect),slide=useRef(onSliceAt),mode=useRef(theme),paint=useRef<((next:Theme)=>void)|null>(null);
+ latest.current=state;select.current=onSelect;slide.current=onSliceAt;mode.current=theme;
+ useEffect(()=>{paint.current?.(theme);},[theme]);
  useEffect(()=>{
   const el=host.current!;let disposed=false,frame=0,dirty=true,ready=false,lastView='',lastReset=-1,lastIsolate='',layoutKey='',amount=0;
   let lastState:SceneState|null=null;
@@ -22,14 +23,19 @@ export default function AnatomyScene({atlas,state,onSelect,onSliceAt,onProgress,
   const scene=new T.Scene(),camera=new T.PerspectiveCamera(34,1,.005,100),controls=new OrbitControls(camera,renderer.domElement);
   camera.position.set(1.1,.95,2.8);controls.target.set(0,STAGE,0);controls.enableDamping=true;controls.dampingFactor=.085;controls.minDistance=.07;controls.maxDistance=40;controls.maxPolarAngle=Math.PI*.96;controls.addEventListener('change',()=>{dirty=true;});
   const pmrem=new T.PMREMGenerator(renderer),room=new RoomEnvironment(),env=pmrem.fromScene(room,.04);scene.environment=env.texture;room.dispose();pmrem.dispose();
-  scene.add(new T.HemisphereLight(0xcfe2f5,0x0a0f16,.7));
+  const ambient=new T.HemisphereLight(0xcfe2f5,0x0a0f16,.7);scene.add(ambient);
   const key=new T.DirectionalLight(0xfff3e6,2.1);key.position.set(-2,4,3);scene.add(key);
   const rim=new T.DirectionalLight(0x7fd8ff,1.7);rim.position.set(2,2,-3);scene.add(rim);
-  // Unlit and matched to the clear colour: a lit floor would draw a hard horizon across the dark scene.
-  const ground=new T.Mesh(new T.CircleGeometry(30,96),new T.MeshBasicMaterial({color:0x080b10}));ground.rotation.x=-Math.PI/2;ground.position.y=-.019;scene.add(ground);
-  const platform=new T.Mesh(new T.CylinderGeometry(.88,.9,.028,100),new T.MeshStandardMaterial({color:0x121a23,metalness:.3,roughness:.55}));platform.position.y=-.016;scene.add(platform);
-  const ring=new T.Mesh(new T.RingGeometry(.83,.834,128),new T.MeshBasicMaterial({color:0x5cd4c6,transparent:true,opacity:.34,side:T.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=.001;scene.add(ring);
-  const innerRing=new T.Mesh(new T.RingGeometry(.73,.731,128),new T.MeshBasicMaterial({color:0x5cd4c6,transparent:true,opacity:.12,side:T.DoubleSide}));innerRing.rotation.x=-Math.PI/2;innerRing.position.y=.001;scene.add(innerRing);
+  // Unlit and matched to the clear colour: a lit floor would draw a hard horizon across the scene.
+  // Tone mapping is skipped so the floor matches the clear colour exactly; otherwise ACES shifts it and draws a horizon.
+  const groundMaterial=new T.MeshBasicMaterial({color:0x080b10,toneMapped:false});
+  const ground=new T.Mesh(new T.CircleGeometry(30,96),groundMaterial);ground.rotation.x=-Math.PI/2;ground.position.y=-.019;scene.add(ground);
+  const platformMaterial=new T.MeshStandardMaterial({color:0x121a23,metalness:.3,roughness:.55});
+  const platform=new T.Mesh(new T.CylinderGeometry(.88,.9,.028,100),platformMaterial);platform.position.y=-.016;scene.add(platform);
+  const ringMaterial=new T.MeshBasicMaterial({color:0x5cd4c6,transparent:true,opacity:.34,side:T.DoubleSide});
+  const ring=new T.Mesh(new T.RingGeometry(.83,.834,128),ringMaterial);ring.rotation.x=-Math.PI/2;ring.position.y=.001;scene.add(ring);
+  const innerRingMaterial=new T.MeshBasicMaterial({color:0x5cd4c6,transparent:true,opacity:.12,side:T.DoubleSide});
+  const innerRing=new T.Mesh(new T.RingGeometry(.73,.731,128),innerRingMaterial);innerRing.rotation.x=-Math.PI/2;innerRing.position.y=.001;scene.add(innerRing);
   const width=T.MathUtils.ceilPowerOfTwo(atlas.parts.length),data=new Float32Array(width*4),partTexture=new T.DataTexture(data,width,1,T.RGBAFormat,T.FloatType);partTexture.needsUpdate=true;
   const selectedData=new Uint8Array(width*4),selectionTexture=new T.DataTexture(selectedData,width,1);selectionTexture.needsUpdate=true;
   const materials:T.Material[]=[],geometries:T.BufferGeometry[]=[],pickers:(T.Mesh|undefined)[]=[],centers=atlas.parts.map(p=>new T.Vector3().fromArray(p.bounds[0]).add(new T.Vector3().fromArray(p.bounds[1])).multiplyScalar(.5));
@@ -50,18 +56,36 @@ export default function AnatomyScene({atlas,state,onSelect,onSliceAt,onProgress,
   };
   /** One plane for the whole atlas, pushed out of range when no cut is active so the shaders never recompile. */
   const clipPlane=new T.Plane(new T.Vector3(0,0,1),1e6);let clipActive=false;
+  /** Shared by every structure material, so the selection colour can follow the theme without recompiling. */
+  const selectTint={value:new T.Color(0x6bd9c7)};
   const materialFor=(system:string)=>{
    const m=new T.MeshStandardMaterial({color:SYSTEMS.find(s=>s.id===system)?.color??'#aebbb8',metalness:.08,roughness:.53,side:T.DoubleSide,clippingPlanes:[clipPlane]});
    m.onBeforeCompile=shader=>{
-    shader.uniforms.partState={value:partTexture};shader.uniforms.selectionState={value:selectionTexture};shader.uniforms.stateWidth={value:width};
+    shader.uniforms.partState={value:partTexture};shader.uniforms.selectionState={value:selectionTexture};shader.uniforms.stateWidth={value:width};shader.uniforms.selectTint=selectTint;
     shader.vertexShader='attribute float partIndex; uniform sampler2D partState; uniform sampler2D selectionState; uniform float stateWidth; varying float partVisible; varying float partSelected;\n'+shader.vertexShader;
     shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvec2 stateUv = vec2((partIndex + 0.5) / stateWidth, 0.5); vec4 state = texture2D(partState, stateUv); transformed += state.xyz; partVisible = state.w; partSelected = texture2D(selectionState, stateUv).r;');
-    shader.fragmentShader='varying float partVisible; varying float partSelected;\n'+shader.fragmentShader;
+    shader.fragmentShader='varying float partVisible; varying float partSelected; uniform vec3 selectTint;\n'+shader.fragmentShader;
     shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\nif (partVisible < 0.5) discard;');
-    shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 0.75);');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, selectTint, partSelected * 0.75);');
    };materials.push(m);return m;
   };
   const mats=new Map(SYSTEMS.map(s=>[s.id,materialFor(s.id)]));
+  /** The stage, lighting, and selection colour are tuned per theme rather than inverted. */
+  const applyTheme=(next:Theme)=>{
+   const light=next==='light';
+   renderer.setClearColor(light?'#e7ebef':'#080b10');renderer.toneMappingExposure=light?1.12:1.05;
+   groundMaterial.color.set(light?0xe7ebef:0x080b10);
+   platformMaterial.color.set(light?0xf6f8fa:0x121a23);platformMaterial.metalness=light?.08:.3;platformMaterial.roughness=light?.72:.55;
+   ringMaterial.color.set(light?0x0b7d73:0x5cd4c6);ringMaterial.opacity=light?.3:.34;
+   innerRingMaterial.color.set(light?0x0b7d73:0x5cd4c6);innerRingMaterial.opacity=light?.11:.12;
+   markerMaterial.color.set(light?0x0b7d73:0x5cd4c6);markerMaterial.opacity=light?.6:.55;
+   ambient.color.set(light?0xffffff:0xcfe2f5);ambient.groundColor.set(light?0xb6c1cb:0x0a0f16);ambient.intensity=light?1:.7;
+   key.color.set(light?0xfffaf4:0xfff3e6);key.intensity=light?2.25:2.1;
+   rim.color.set(light?0xe9f0ff:0x7fd8ff);rim.intensity=light?1.5:1.7;
+   selectTint.value.set(light?0x0f9c8e:0x6bd9c7);
+   dirty=true;
+  };
+  applyTheme(mode.current);paint.current=applyTheme;
   let loaded=0;
   const loadChunk=async(ci:number)=>{
    const chunk=atlas.chunks[ci],compressed=!!chunk.gzip&&typeof DecompressionStream!=='undefined';const response=await fetch(compressed?chunk.gzip!:chunk.url,{signal:abort.signal});const buffer=await decodeModelResponse(response,chunk.bytes,compressed);if(disposed)return;
@@ -181,7 +205,7 @@ export default function AnatomyScene({atlas,state,onSelect,onSliceAt,onProgress,
 
   };animate();
   const contextLost=(e:Event)=>{e.preventDefault();onError('The 3D session was paused by your device. Reload to continue.');};renderer.domElement.addEventListener('webglcontextlost',contextLost);
-  return()=>{disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();renderer.domElement.removeEventListener('pointerleave',leave);controls.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!geometries.includes(o.geometry)){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});env.dispose();partTexture.dispose();selectionTexture.dispose();markerGeometry.dispose();markerMaterial.dispose();hover.remove();renderer.dispose();renderer.domElement.remove();};
+  return()=>{disposed=true;paint.current=null;abort.abort();cancelAnimationFrame(frame);observer.disconnect();renderer.domElement.removeEventListener('pointerleave',leave);controls.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!geometries.includes(o.geometry)){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});env.dispose();partTexture.dispose();selectionTexture.dispose();markerGeometry.dispose();markerMaterial.dispose();hover.remove();renderer.dispose();renderer.domElement.remove();};
  },[atlas]);
  return <div className="scene" ref={host}/>;
 }

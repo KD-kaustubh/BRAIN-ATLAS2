@@ -1,20 +1,27 @@
 import {flushSync} from 'react-dom';
 import {registerAtlasTools} from './agent-tools';
 import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
-import {Activity,ArrowUpRight,ChevronRight,Focus,Info,Layers3,Pause,RotateCcw,RotateCw,Search,X} from 'lucide-react';
+import {Activity,ArrowUpRight,ChevronRight,Focus,Info,Layers3,Moon,Pause,RotateCcw,RotateCw,Search,Sun,X} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Slider} from '@/components/ui/slider';
 import {Switch} from '@/components/ui/switch';
 import {Sheet,SheetContent,SheetTitle,SheetDescription} from '@/components/ui/sheet';
 import {Combobox,ComboboxInput,ComboboxContent,ComboboxList,ComboboxItem,ComboboxEmpty} from '@/components/ui/combobox';
 import AnatomyScene from './scene';
-import {DEFAULT_VISIBLE,FEATURED,PRESETS,SLICES,SYSTEMS,VIEWS,explanation,type Atlas,type Concept,type SceneState,type SystemId} from './anatomy';
+import {DEFAULT_VISIBLE,FEATURED,PRESETS,SLICES,SYSTEMS,VIEWS,explanation,type Atlas,type Concept,type SceneState,type SystemId,type Theme} from './anatomy';
 const initial:SceneState={explode:0,visible:DEFAULT_VISIBLE,selected:[],isolate:false,view:'three-quarter',rotate:false,reset:0,slice:'none',sliceAt:.5,sliceFlip:false,sliceTrack:false};
+const THEME_KEY='brain-atlas-theme';
+/** Storage is unavailable in some privacy modes, so a failed read just falls back to the system preference. */
+function storedTheme():Theme{
+ try{const saved=localStorage.getItem(THEME_KEY);if(saved==='light'||saved==='dark')return saved;}catch{/* fall through */}
+ return matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+}
 export default function Home(){
  const detailTitle=useRef<HTMLHeadingElement>(null);
- const [atlas,setAtlas]=useState<Atlas|null>(null),[state,setState]=useState(initial),[progress,setProgress]=useState(0),[error,setError]=useState(''),[panel,setPanel]=useState<'layers'|'search'|null>(null),[details,setDetails]=useState(false),[about,setAbout]=useState(false),[query,setQuery]=useState(''),[chosen,setChosen]=useState<Concept|null>(null);
+ const [atlas,setAtlas]=useState<Atlas|null>(null),[state,setState]=useState(initial),[progress,setProgress]=useState(0),[error,setError]=useState(''),[panel,setPanel]=useState<'layers'|'search'|null>(null),[details,setDetails]=useState(false),[about,setAbout]=useState(false),[query,setQuery]=useState(''),[chosen,setChosen]=useState<Concept|null>(null),[theme,setTheme]=useState<Theme>(storedTheme);
  useEffect(()=>{const abort=new AbortController();setProgress(0);setError('');setAtlas(null);setChosen(null);setDetails(false);setState({...initial,visible:DEFAULT_VISIBLE});fetch('/models/atlas.json',{signal:abort.signal}).then(r=>{if(!r.ok)throw new Error('The brain catalogue could not be loaded.');return r.json();}).then(data=>setAtlas(data as Atlas)).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>abort.abort();},[]);
  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='/'&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLTextAreaElement)){e.preventDefault();setPanel('search');setDetails(false);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[]);
+ useEffect(()=>{document.documentElement.dataset.theme=theme;try{localStorage.setItem(THEME_KEY,theme);}catch{/* preference is not persisted */}},[theme]);
  const parts=useMemo(()=>new Map(atlas?.parts.map(p=>[p.id,p])),[atlas]);
  const counts=useMemo(()=>Object.fromEntries(SYSTEMS.map(s=>[s.id,atlas?.parts.filter(p=>p.system===s.id).length??0])),[atlas]);
  const activeSystems=SYSTEMS.filter(s=>counts[s.id]>0);
@@ -29,7 +36,7 @@ export default function Home(){
  const openPanel=(next:'layers'|'search')=>{setDetails(false);setPanel(p=>p===next?null:next);};
  const caption=state.isolate?(chosen?.name??'Selected structure'):state.explode>.95?'Structure inventory':state.explode>.05?'Separated structures':'Human brain';
  return <main className="console">
-  {atlas&&<AnatomyScene atlas={atlas} state={{...state,inspectorOpen:details&&selectedParts.length>0}} onSelect={choosePart} onSliceAt={at=>setState(s=>({...s,sliceAt:at}))} onProgress={n=>{setProgress(n);if(n===100)setError('');}} onError={setError}/>}
+  {atlas&&<AnatomyScene atlas={atlas} state={{...state,inspectorOpen:details&&selectedParts.length>0}} theme={theme} onSelect={choosePart} onSliceAt={at=>setState(s=>({...s,sliceAt:at}))} onProgress={n=>{setProgress(n);if(n===100)setError('');}} onError={setError}/>}
   <div className="scene-glow"/>
 
   <aside className={`rail ${panel==='layers'?'mobile-open':''}`} aria-label="Brain regions">
@@ -67,6 +74,7 @@ export default function Home(){
 
   <nav className="top-bar" aria-label="Explorer panels">
    <Button variant="ghost" className={panel==='search'?'active':''} onClick={()=>openPanel('search')} aria-label="Search the brain"><Search size={17}/><span>Find a structure</span><kbd>/</kbd></Button>
+   <Button variant="ghost" className="icon-button" aria-label={theme==='light'?'Switch to dark theme':'Switch to light theme'} title={theme==='light'?'Dark theme':'Light theme'} onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>{theme==='light'?<Moon size={17}/>:<Sun size={17}/>}</Button>
    <Button variant="ghost" className="icon-button" aria-label="About this atlas" onClick={()=>{setDetails(false);setPanel(null);setAbout(true);}}><Info size={17}/></Button>
   </nav>
 

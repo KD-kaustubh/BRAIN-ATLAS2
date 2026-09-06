@@ -14,7 +14,7 @@ An interactive 3D atlas of the human brain, built with React, Three.js, and shad
 - Isolate a selected structure and read its description.
 - Use compact controls and detail panels on mobile.
 
-The interface is a dark imaging-console layout: a docked region rail, a docked inspector that the rest of the layout makes room for, and monospaced readouts.
+The interface is an imaging-console layout: a docked region rail, a docked inspector that the rest of the layout makes room for, and monospaced readouts. It ships in dark and light themes — each with its own palette, stage colours, and lighting rather than one inverted into the other — following the system preference until you pick one, after which the choice is remembered.
 
 ## Run locally
 
