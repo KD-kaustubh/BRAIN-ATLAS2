@@ -5,6 +5,8 @@ An interactive 3D atlas of the human brain, built with React, Three.js, and shad
 ## Explore
 
 - Orbit, zoom, and select structures directly on the brain.
+- Hover anywhere on the brain to name the structure under the pointer and the region it belongs to.
+- Cut the brain on the sagittal, coronal, or axial plane to see inside, sliding the cut through the tissue or letting it follow the pointer. Structures revealed by a cut can be hovered and selected like any other.
 - Toggle regions, or jump to the cortex, deep brain, and brainstem presets.
 - Move from the assembled brain to a spaced inventory of every visible structure.
 - Switch between oblique, anterior, lateral, superior, and posterior views.

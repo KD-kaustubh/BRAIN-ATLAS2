@@ -23,7 +23,16 @@ export const VIEWS:{id:View;label:string;name:string}[] = [
  {id:'superior',label:'SUP',name:'Superior view'},
  {id:'posterior',label:'POS',name:'Posterior view'},
 ];
-export interface SceneState {inspectorOpen?:boolean;explode:number;visible:SystemId[];selected:string[];isolate:boolean;view:View;rotate:boolean;reset:number}
+export type SliceAxis = 'none'|'sagittal'|'coronal'|'axial';
+/** Index of the world axis each cut runs along: x separates left from right, y top from bottom, z front from back. */
+export const SLICE_AXIS:Record<Exclude<SliceAxis,'none'>,0|1|2> = {sagittal:0,axial:1,coronal:2};
+export const SLICES:{id:SliceAxis;label:string;name:string}[] = [
+ {id:'none',label:'Off',name:'No cut'},
+ {id:'sagittal',label:'SAG',name:'Sagittal cut, separating left from right'},
+ {id:'coronal',label:'COR',name:'Coronal cut, separating front from back'},
+ {id:'axial',label:'AXI',name:'Axial cut, separating top from bottom'},
+];
+export interface SceneState {inspectorOpen?:boolean;explode:number;visible:SystemId[];selected:string[];isolate:boolean;view:View;rotate:boolean;reset:number;slice:SliceAxis;sliceAt:number;sliceFlip:boolean;sliceTrack:boolean}
 export const DEFAULT_VISIBLE:SystemId[] = ['cortex','whitematter','limbic','diencephalon','brainstem','cerebellum','ventricles','cranialnerves'];
 export const PRESETS:{name:string;systems:SystemId[]}[] = [
  {name:'Cortex',systems:['cortex']},

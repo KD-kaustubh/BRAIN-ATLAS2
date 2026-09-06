@@ -8,8 +8,8 @@ import {Switch} from '@/components/ui/switch';
 import {Sheet,SheetContent,SheetTitle,SheetDescription} from '@/components/ui/sheet';
 import {Combobox,ComboboxInput,ComboboxContent,ComboboxList,ComboboxItem,ComboboxEmpty} from '@/components/ui/combobox';
 import AnatomyScene from './scene';
-import {DEFAULT_VISIBLE,FEATURED,PRESETS,SYSTEMS,VIEWS,explanation,type Atlas,type Concept,type SceneState,type SystemId} from './anatomy';
-const initial:SceneState={explode:0,visible:DEFAULT_VISIBLE,selected:[],isolate:false,view:'three-quarter',rotate:false,reset:0};
+import {DEFAULT_VISIBLE,FEATURED,PRESETS,SLICES,SYSTEMS,VIEWS,explanation,type Atlas,type Concept,type SceneState,type SystemId} from './anatomy';
+const initial:SceneState={explode:0,visible:DEFAULT_VISIBLE,selected:[],isolate:false,view:'three-quarter',rotate:false,reset:0,slice:'none',sliceAt:.5,sliceFlip:false,sliceTrack:false};
 export default function Home(){
  const detailTitle=useRef<HTMLHeadingElement>(null);
  const [atlas,setAtlas]=useState<Atlas|null>(null),[state,setState]=useState(initial),[progress,setProgress]=useState(0),[error,setError]=useState(''),[panel,setPanel]=useState<'layers'|'search'|null>(null),[details,setDetails]=useState(false),[about,setAbout]=useState(false),[query,setQuery]=useState(''),[chosen,setChosen]=useState<Concept|null>(null);
@@ -29,7 +29,7 @@ export default function Home(){
  const openPanel=(next:'layers'|'search')=>{setDetails(false);setPanel(p=>p===next?null:next);};
  const caption=state.isolate?(chosen?.name??'Selected structure'):state.explode>.95?'Structure inventory':state.explode>.05?'Separated structures':'Human brain';
  return <main className="console">
-  {atlas&&<AnatomyScene atlas={atlas} state={{...state,inspectorOpen:details&&selectedParts.length>0}} onSelect={choosePart} onProgress={n=>{setProgress(n);if(n===100)setError('');}} onError={setError}/>}
+  {atlas&&<AnatomyScene atlas={atlas} state={{...state,inspectorOpen:details&&selectedParts.length>0}} onSelect={choosePart} onSliceAt={at=>setState(s=>({...s,sliceAt:at}))} onProgress={n=>{setProgress(n);if(n===100)setError('');}} onError={setError}/>}
   <div className="scene-glow"/>
 
   <aside className={`rail ${panel==='layers'?'mobile-open':''}`} aria-label="Brain regions">
@@ -50,6 +50,17 @@ export default function Home(){
       <Switch checked={state.visible.includes(s.id)} onCheckedChange={()=>toggle(s.id)} aria-label={`Show ${s.name.toLowerCase()}`}/>
      </div>)}
     </div>
+    <div className="slice-block">
+     <div className="rail-label"><span>Cut plane</span>{state.slice!=='none'&&<span className="small-number">{Math.round(state.sliceAt*100)}%</span>}</div>
+     <div className="preset-row">{SLICES.map(sl=><Button variant="ghost" key={sl.id} aria-pressed={state.slice===sl.id} disabled={state.explode>.05} title={sl.name} onClick={()=>setState(s=>({...s,slice:sl.id,sliceAt:s.slice===sl.id?s.sliceAt:.5}))}>{sl.label}</Button>)}</div>
+     {state.slice!=='none'&&<>
+      <Slider className="slice-slider" aria-label="Cut position" min={0} max={100} step={1} value={[state.sliceAt*100]} onValueChange={v=>setState(s=>({...s,sliceAt:(Array.isArray(v)?v[0]:v)/100}))}/>
+      <div className="slice-toggles">
+       <Button variant="ghost" aria-pressed={state.sliceTrack} title="Move the cut to whatever the pointer is over" onClick={()=>setState(s=>({...s,sliceTrack:!s.sliceTrack}))}>Follow cursor</Button>
+       <Button variant="ghost" aria-pressed={state.sliceFlip} title="Keep the other half" onClick={()=>setState(s=>({...s,sliceFlip:!s.sliceFlip}))}>Flip</Button>
+      </div>
+     </>}
+    </div>
     <div className="rail-foot"><span>{visibleCount.toLocaleString()} / {atlas?.parts.length.toLocaleString()??'139'} visible</span><Button variant="ghost" onClick={()=>setState(s=>({...s,visible:[],selected:[],isolate:false}))}>Hide all</Button></div>
    </div>
   </aside>
@@ -69,10 +80,10 @@ export default function Home(){
 
   <div className="status-bar">
    <Button variant="ghost" className="mobile-only dock-layers" onClick={()=>openPanel('layers')} aria-label="Open brain regions"><Layers3 size={19}/><span>Regions</span></Button>
-   <div className="status-caption desktop-only"><b>{caption}</b><span className="status-hint">{state.explode>.8?'Drag to pan':'Drag to orbit'} · Scroll to zoom · Click to inspect</span></div>
+   <div className="status-caption desktop-only"><b>{caption}</b><span className="status-hint">{state.explode>.8?'Drag to pan':'Hover to identify'} · Click to inspect</span></div>
    <div className="explode-control">
     <div className="explode-head"><label id="explode-label">Explode</label><output>{Math.round(state.explode*100)}<span>%</span></output></div>
-    <Slider aria-labelledby="explode-label" min={0} max={100} step={1} value={[state.explode*100]} onValueChange={v=>setState(s=>({...s,explode:(Array.isArray(v)?v[0]:v)/100,view:(Array.isArray(v)?v[0]:v)>80?'anterior':s.view,rotate:false}))}/>
+    <Slider aria-labelledby="explode-label" min={0} max={100} step={1} value={[state.explode*100]} onValueChange={v=>{const next=(Array.isArray(v)?v[0]:v)/100;setState(s=>({...s,explode:next,view:next>.8?'anterior':s.view,rotate:false,slice:next>.05?'none':s.slice}));}}/>
     <div className="slider-ends"><span>Assembled</span><span>Every structure</span></div>
    </div>
    <Button variant="ghost" className="status-reset" onClick={reset} aria-label="Assemble and reset"><RotateCcw size={16}/><span>Reset</span></Button>
